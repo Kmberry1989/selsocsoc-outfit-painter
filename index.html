@@ -90,6 +90,11 @@
           <div class="npc-strip" id="npcStrip"></div>
           <p class="drop-note">Tap a look to load it as a starting point, then paint over it.</p>
         </div>
+        <div class="tune" style="margin-top:14px;padding-top:14px">
+          <div class="section-head"><h2>Player outfits</h2><span id="playerCount"></span></div>
+          <div class="npc-strip" id="playerStrip"></div>
+          <p class="drop-note">Tap an outfit to load it as a starting point, then paint over it.</p>
+        </div>
 
         <div class="tune">
           <div class="section-head"><h2>2. Fit the <span id="currentSideName">front</span></h2><span>Drag the model to rotate</span></div>
@@ -197,28 +202,57 @@
           var im=document.createElement('img');im.loading='lazy';im.crossOrigin='anonymous';im.src=base+c.outfitUrl;im.alt=c.name+' outfit';
           var lb=document.createElement('span');lb.textContent=c.name;
           b.appendChild(im);b.appendChild(lb);
-          b.addEventListener('click',function(){applyNpcLook(base+c.outfitUrl,c.name);});
+          b.addEventListener('click',function(){applyWrapLook(base+c.outfitUrl,c.name);});
           strip.appendChild(b);
         });
       }).catch(function(){document.getElementById('npcCount').textContent='offline';});
     }
-    function applyNpcLook(url,name){
+    var WRAP_BANDS={front:[.375,.625],right:[.125,.375],left:[.625,.875]};
+    function applyWrapLook(url,name){
       var img=new Image();img.crossOrigin='anonymous';
       img.onload=function(){
         var done=0;
-        names.forEach(function(n){
-          var b=bands[n],sx=Math.round(b[0]*img.width),sw=Math.round((b[1]-b[0])*img.width),sy=Math.round(.094*img.height),sh=Math.round(.813*img.height);
-          var cv=document.createElement('canvas');cv.width=512;cv.height=512;
-          cv.getContext('2d').drawImage(img,sx,sy,sw,sh,0,0,512,512);
+        function finish(side,cv){
           var im=new Image();
-          im.onload=(function(side,ii){return function(){var st=state.sides[side];st.img=ii;st.url=ii.src;st.scale=100;st.x=0;st.y=0;st.rotation=0;if(++done===4){updateCards();rebuildAtlas(true);toast(name+' look loaded - paint over any panel.');}};})(n,im);
+          im.onload=(function(s,ii){return function(){var st=state.sides[s];st.img=ii;st.url=ii.src;st.scale=100;st.x=0;st.y=0;st.rotation=0;if(++done===4){updateCards();rebuildAtlas(true);toast(name+' look loaded - paint over any panel.');}};})(side,im);
           im.src=cv.toDataURL('image/png');
+        }
+        ['front','right','back','left'].forEach(function(n){
+          var cv=document.createElement('canvas');cv.width=512;cv.height=512;
+          var cx=cv.getContext('2d');
+          if(n==='back'){
+            var w1=Math.round(.125*img.width);
+            cx.drawImage(img,img.width-w1,0,w1,img.height,0,0,256,512);
+            cx.drawImage(img,0,0,w1,img.height,256,0,256,512);
+          }else{
+            var b=WRAP_BANDS[n],sx=Math.round(b[0]*img.width),sw=Math.round((b[1]-b[0])*img.width);
+            cx.drawImage(img,sx,0,sw,img.height,0,0,512,512);
+          }
+          finish(n,cv);
         });
       };
       img.onerror=function(){toast('Could not load that look. Check the connection.');};
       img.src=url;
     }
-    loadNpcLooks();
+    var PLAYER_MANIFEST='https://raw.githubusercontent.com/Kmberry1989/selsocsoc/main/assets/outfit-textures/manifest.json';
+    function loadPlayerLooks(){
+      var strip=document.getElementById('playerStrip');if(!strip)return;
+      fetch(PLAYER_MANIFEST,{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('player manifest '+r.status);return r.json();}).then(function(m){
+        var base='https://raw.githubusercontent.com/Kmberry1989/selsocsoc/main/';
+        var outfits=(m.outfits||[]).filter(function(o){return o.path;});
+        document.getElementById('playerCount').textContent=outfits.length+' outfits';
+        strip.innerHTML='';
+        outfits.forEach(function(o){
+          var b=document.createElement('button');b.type='button';b.title=o.name;
+          var im=document.createElement('img');im.loading='lazy';im.crossOrigin='anonymous';im.src=base+o.path;im.alt=o.name;
+          var lb=document.createElement('span');lb.textContent=o.name;
+          b.appendChild(im);b.appendChild(lb);
+          b.addEventListener('click',function(){applyWrapLook(base+o.path,o.name);});
+          strip.appendChild(b);
+        });
+      }).catch(function(){document.getElementById('playerCount').textContent='offline';});
+    }
+    loadNpcLooks();loadPlayerLooks();
     updateCards();syncControls();updateAngleLabel(0);rebuildAtlas();
   })();
   </script>
