@@ -60,6 +60,11 @@
     .orientation{position:absolute;left:16px;bottom:16px;background:color-mix(in srgb,var(--panel) 92%,transparent);border:1px solid var(--line);border-radius:8px;padding:8px 11px;font-size:11px;color:var(--muted)}
     .turn{position:absolute;top:50%;transform:translateY(-50%);width:42px;height:42px;border-radius:50%;background:color-mix(in srgb,var(--panel) 94%,transparent);border:1px solid var(--line);font-size:21px;cursor:pointer}.turn.left{left:14px}.turn.right{right:14px}.turn:hover{border-color:var(--accent)}
     .toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);background:var(--ink);color:var(--panel);padding:10px 15px;border-radius:8px;font-size:13px;opacity:0;pointer-events:none;transition:.2s;z-index:10}.toast.show{opacity:1;transform:translate(-50%,0)}
+    .npc-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+    .npc-strip button{border:1.5px solid var(--line);border-radius:8px;background:var(--panel-2);padding:4px;cursor:pointer;min-height:64px}
+    .npc-strip button:hover,.npc-strip button:focus-visible{border-color:var(--accent);outline:none}
+    .npc-strip img{width:100%;height:52px;object-fit:cover;border-radius:5px;display:block}
+    .npc-strip span{display:block;font-size:10px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     @media(max-width:820px){.app{padding:14px}.intro{display:block;margin-bottom:18px}.lede{margin-top:12px}.workspace{grid-template-columns:1fr}.preview{grid-row:1;border-radius:14px;min-height:0}.controls{border-radius:14px;min-height:0}.stage{min-height:430px}.tip{margin-top:20px}.preview-bar{align-items:stretch;flex-direction:column}.preview-actions{justify-content:flex-end}.view-tabs{display:grid;grid-template-columns:repeat(4,1fr)}.view-tabs button{padding:9px 5px}.turn{width:38px;height:38px}.orientation{bottom:10px}.controls{padding:16px}}
     @media(max-width:440px){h1{font-size:38px}.stage{min-height:390px}.canvas-btn{padding:7px 9px}.preview-actions .secondary-label{display:none}.sides{gap:8px}.side-card{min-height:104px}}
     @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
@@ -77,6 +82,11 @@
         <div class="section-head"><h2>1. Add your artwork</h2><span>PNG, JPG or WebP</span></div>
         <div class="sides" id="sideCards"></div>
         <p class="drop-note">Tap a side to choose a file, or drop an image onto it.</p>
+        <div class="tune" style="margin-top:14px;padding-top:14px">
+          <div class="section-head"><h2>NPC signature looks</h2><span id="npcCount"></span></div>
+          <div class="npc-strip" id="npcStrip"></div>
+          <p class="drop-note">Tap a look to load it as a starting point, then paint over it.</p>
+        </div>
 
         <div class="tune">
           <div class="section-head"><h2>2. Fit the <span id="currentSideName">front</span></h2><span>Drag the model to rotate</span></div>
@@ -171,6 +181,41 @@
     document.getElementById('clearBtn').addEventListener('click',function(){var s=state.sides[state.side];if(!s.img){toast('No image to remove.');return;}s.img=null;s.url='';s.scale=100;s.x=0;s.y=0;s.rotation=0;syncControls();updateCards();rebuildAtlas(true);toast(labels[state.side]+' artwork removed.');});
     document.getElementById('downloadBtn').addEventListener('click',function(){var a=document.createElement('a');a.download='outfit-game-model-preview.png';a.href=viewer.download();a.click();toast('3D model preview downloaded.');});
     function toast(msg){var t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._timer);t._timer=setTimeout(function(){t.classList.remove('show');},2200);}
+    var NPC_MANIFEST='https://raw.githubusercontent.com/Kmberry1989/selsocsoc/main/assets/npc/manifest.json';
+    function loadNpcLooks(){
+      var strip=document.getElementById('npcStrip');if(!strip)return;
+      fetch(NPC_MANIFEST,{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('npc manifest '+r.status);return r.json();}).then(function(m){
+        var base=m.assetBase||'https://raw.githubusercontent.com/Kmberry1989/selsocsoc/main/';
+        var chars=(m.characters||[]).filter(function(c){return c.outfitUrl;});
+        document.getElementById('npcCount').textContent=chars.length+' looks';
+        strip.innerHTML='';
+        chars.forEach(function(c){
+          var b=document.createElement('button');b.type='button';b.title=c.name+' - '+c.role;
+          var im=document.createElement('img');im.loading='lazy';im.crossOrigin='anonymous';im.src=base+c.outfitUrl;im.alt=c.name+' outfit';
+          var lb=document.createElement('span');lb.textContent=c.name;
+          b.appendChild(im);b.appendChild(lb);
+          b.addEventListener('click',function(){applyNpcLook(base+c.outfitUrl,c.name);});
+          strip.appendChild(b);
+        });
+      }).catch(function(){document.getElementById('npcCount').textContent='offline';});
+    }
+    function applyNpcLook(url,name){
+      var img=new Image();img.crossOrigin='anonymous';
+      img.onload=function(){
+        var done=0;
+        names.forEach(function(n){
+          var b=bands[n],sx=Math.round(b[0]*img.width),sw=Math.round((b[1]-b[0])*img.width),sy=Math.round(.094*img.height),sh=Math.round(.813*img.height);
+          var cv=document.createElement('canvas');cv.width=512;cv.height=512;
+          cv.getContext('2d').drawImage(img,sx,sy,sw,sh,0,0,512,512);
+          var im=new Image();
+          im.onload=(function(side,ii){return function(){var st=state.sides[side];st.img=ii;st.url=ii.src;st.scale=100;st.x=0;st.y=0;st.rotation=0;if(++done===4){updateCards();rebuildAtlas(true);toast(name+' look loaded - paint over any panel.');}};})(n,im);
+          im.src=cv.toDataURL('image/png');
+        });
+      };
+      img.onerror=function(){toast('Could not load that look. Check the connection.');};
+      img.src=url;
+    }
+    loadNpcLooks();
     updateCards();syncControls();updateAngleLabel(0);rebuildAtlas();
   })();
   </script>
