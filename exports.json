@@ -1,0 +1,16 @@
+{
+  "editor": "outfit-painter",
+  "name": "Outfit Painter",
+  "shares": [
+    {
+      "type": "outfit-texture",
+      "format": "png",
+      "location": "assets/outfit-textures/",
+      "note": "Grayscale 4-island UV outfit textures; tinted in-game"
+    }
+  ],
+  "consumes": [
+    "npc-outfits"
+  ],
+  "npcManifest": "https://raw.githubusercontent.com/Kmberry1989/selsocsoc/main/assets/npc/manifest.json"
+}
