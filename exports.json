@@ -6,7 +6,7 @@
       "type": "outfit-texture",
       "format": "png",
       "location": "assets/outfit-textures/",
-      "note": "Grayscale 4-island UV outfit textures; tinted in-game"
+      "note": "2240 x 1120 wraparound outfit texture (FRONT at u=0.5, BACK split across the seam); drop into the game's outfit-textures folder and add a manifest entry"
     }
   ],
   "consumes": [

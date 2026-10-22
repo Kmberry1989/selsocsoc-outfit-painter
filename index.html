@@ -110,7 +110,7 @@
             <button id="clearBtn" class="danger" type="button">Remove</button>
           </div>
         </div>
-        <div class="tip"><strong>Texture tip:</strong> use 1024 × 1024 square panels. Each image fills one face of the cube body; transparent areas reveal the base material.</div>
+        <div class="tip"><strong>Texture tip:</strong> use 1024 × 1024 square panels. Each image fills one face of the cube body; transparent areas reveal the base material. Download game texture exports a 2240 × 1120 wraparound for the game's outfit-textures folder.</div>
       </section>
 
       <section class="panel preview" aria-label="Avatar preview">
@@ -119,6 +119,7 @@
           <div class="preview-actions">
             <button class="canvas-btn" id="guideBtn" type="button"><span class="secondary-label">Hide </span>seams</button>
             <button class="canvas-btn primary" id="downloadBtn" type="button">Download preview</button>
+            <button class="canvas-btn primary" id="textureBtn" type="button">Download game texture</button>
           </div>
         </div>
         <div class="stage">
@@ -174,10 +175,24 @@
     function updateOutput(k,v){document.getElementById(k+'Out').textContent=(k==='scale'?v+'%':k==='rotation'?v+'°':v);}
     Object.keys(controls).forEach(function(k){controls[k].addEventListener('input',function(){state.sides[state.side][k]=Number(this.value);updateOutput(k,this.value);rebuildAtlas();});});
 
+    function renderPanel(name){var s=state.sides[name];if(!s.img)return null;var panel=document.createElement('canvas');panel.width=512;panel.height=512;var p=panel.getContext('2d');var fit=Math.min(512/s.img.width,512/s.img.height)*s.scale/100;var iw=s.img.width*fit,ih=s.img.height*fit;p.translate(256+s.x*1.25,256+s.y);p.rotate(s.rotation*Math.PI/180);p.drawImage(s.img,-iw/2,-ih/2,iw,ih);return panel;}
     function rebuildAtlas(analyze){
       var c=atlas.getContext('2d');c.clearRect(0,0,1024,1024);
-      names.forEach(function(name){var s=state.sides[name];if(!s.img)return;var b=bands[name],x0=Math.round(b[0]*1024),w=Math.round((b[1]-b[0])*1024),y0=Math.round(.094*1024),h=Math.round(.813*1024);var panel=document.createElement('canvas');panel.width=512;panel.height=512;var p=panel.getContext('2d');var fit=Math.min(512/s.img.width,512/s.img.height)*s.scale/100;var iw=s.img.width*fit,ih=s.img.height*fit;p.translate(256+s.x*1.25,256+s.y);p.rotate(s.rotation*Math.PI/180);p.drawImage(s.img,-iw/2,-ih/2,iw,ih);c.drawImage(panel,x0,y0,w,h);});
+      names.forEach(function(name){var panel=renderPanel(name);if(!panel)return;var b=bands[name],x0=Math.round(b[0]*1024),w=Math.round((b[1]-b[0])*1024),y0=Math.round(.094*1024),h=Math.round(.813*1024);c.drawImage(panel,x0,y0,w,h);});
       viewer.setAtlas(atlas,!!analyze);
+    }
+    // Game wraparound strip: 2240 x 1120, FRONT at u=0.5, avatar's right
+    // toward -u, BACK split across the u=0/1 seam (same layout the game
+    // paints with in outfit-textures.js). Each painted panel covers one
+    // quarter of the way around; the back panel's centre sits on the seam.
+    function buildStrip(){
+      var strip=document.createElement('canvas');strip.width=2240;strip.height=1120;
+      var c=strip.getContext('2d');
+      var placed={right:280,front:840,left:1400};
+      ['right','front','left'].forEach(function(name){var panel=renderPanel(name);if(panel)c.drawImage(panel,placed[name],0,560,1120);});
+      var back=renderPanel('back');
+      if(back){c.drawImage(back,0,0,256,512,1960,0,280,1120);c.drawImage(back,256,0,256,512,0,0,280,1120);}
+      return strip;
     }
     function nearestSide(angle){var a=Math.atan2(Math.sin(angle),Math.cos(angle));if(a>Math.PI*.75||a<-Math.PI*.75)return'back';if(a<-.25*Math.PI)return'right';if(a>.25*Math.PI)return'left';return'front';}
     function updateAngleLabel(angle){document.getElementById('angleLabel').textContent='3D '+nearestSide(angle).toUpperCase();}
@@ -188,6 +203,7 @@
     document.getElementById('fitBtn').addEventListener('click',function(){var s=state.sides[state.side];s.scale=100;s.x=0;s.y=0;s.rotation=0;syncControls();rebuildAtlas();});
     document.getElementById('clearBtn').addEventListener('click',function(){var s=state.sides[state.side];if(!s.img){toast('No image to remove.');return;}s.img=null;s.url='';s.scale=100;s.x=0;s.y=0;s.rotation=0;syncControls();updateCards();rebuildAtlas(true);toast(labels[state.side]+' artwork removed.');});
     document.getElementById('downloadBtn').addEventListener('click',function(){var a=document.createElement('a');a.download='outfit-game-model-preview.png';a.href=viewer.download();a.click();toast('3D model preview downloaded.');});
+    document.getElementById('textureBtn').addEventListener('click',function(){var painted=names.some(function(n){return !!state.sides[n].img;});if(!painted){toast('Paint a panel first.');return;}var a=document.createElement('a');a.download='outfit-v2.png';a.href=buildStrip().toDataURL('image/png');a.click();toast('Game texture downloaded (2240 x 1120 wraparound).');});
     function toast(msg){var t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._timer);t._timer=setTimeout(function(){t.classList.remove('show');},2200);}
     var NPC_MANIFEST='https://raw.githubusercontent.com/Kmberry1989/selsocsoc/main/assets/npc/manifest.json';
     function loadNpcLooks(){
